@@ -1,5 +1,4 @@
 from typing import Literal, TypedDict
-
 from langgraph.graph import END, START, StateGraph
 
 
@@ -18,6 +17,7 @@ class GraphState(TypedDict):
 def draft_content(state: GraphState) -> GraphState:
     topic = state["topic"]
     iteration = state["iteration"]
+
     if iteration == 0:
         draft = f"{topic} 入门说明：先理解核心概念，再通过小例子动手实践。"
     else:
@@ -25,11 +25,13 @@ def draft_content(state: GraphState) -> GraphState:
             state["draft"]
             + f" 第 {iteration + 1} 轮补充：增加边界条件、错误处理和可观测性说明。"
         )
+
     return {"draft": draft}
 
 
 def review_content(state: GraphState) -> GraphState:
     draft = state["draft"]
+
     score = 60
     if "边界条件" in draft:
         score += 20
@@ -39,6 +41,7 @@ def review_content(state: GraphState) -> GraphState:
         score += 10
 
     feedback = "达到发布标准。" if score >= 90 else "内容还不够完整，需要继续补充工程细节。"
+
     return {"score": score, "feedback": feedback}
 
 
@@ -54,18 +57,22 @@ def revise_content(state: GraphState) -> GraphState:
 
 def main() -> None:
     builder = StateGraph(GraphState)
-    builder.add_node("draft", draft_content)
-    builder.add_node("review", review_content)
-    builder.add_node("revise", revise_content)
 
-    builder.add_edge(START, "draft")
-    builder.add_edge("draft", "review")
+    # ⚠️ 关键修改：node 名称不要叫 draft / review / revise（避免和字段冲突更安全）
+    builder.add_node("draft_node", draft_content)
+    builder.add_node("review_node", review_content)
+    builder.add_node("revise_node", revise_content)
+
+    builder.add_edge(START, "draft_node")
+    builder.add_edge("draft_node", "review_node")
+
     builder.add_conditional_edges(
-        "review",
+        "review_node",
         decide_next_step,
-        {"revise": "revise", "finish": END},
+        {"revise": "revise_node", "finish": END},
     )
-    builder.add_edge("revise", "draft")
+
+    builder.add_edge("revise_node", "draft_node")
 
     graph = builder.compile()
 
